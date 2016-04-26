@@ -1,8 +1,12 @@
 import csv
+import numpy as np
+from random import shuffle
 import nltk.classify.util
 from nltk.classify import NaiveBayesClassifier
 from nltk.tokenize import RegexpTokenizer
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import HashingVectorizer, CountVectorizer 
+from sklearn.naive_bayes import BernoulliNB
+from sklearn import metrics
     
 
 def importReviews(filename):
@@ -22,9 +26,10 @@ def splitReviews(reviews):
     unhelpful = []
 
     for review in reviews:
-        if review['Score'] > 3:
+        score = int(review['Score'])
+        if score > 3:
             positive.append(review)
-        if review['Score'] < 3:
+        if score < 3:
             negative.append(review)
     
         helpful_num = float(review['HelpfulnessNumerator'])
@@ -47,34 +52,69 @@ def splitReviews(reviews):
 
 def train(categorized):
 
-    helpful = getText(categorized['helpful'])
-    unhelpful = getText(categorized['unhelpful'])
+    class_0 = getText(categorized['helpful'])
+    class_1 = getText(categorized['unhelpful'])
 
-    helpfulCutoff = len(helpful) * 3/4
-    unhelpfulCutoff = len(unhelpful) * 3/4
 
-    print helpfulCutoff
+    x_data = []
+    x_data.extend(class_0)
+    x_data.extend(class_1)
 
-    trainFeats = helpful[:helpfulCutoff] + unhelpful[:unhelpfulCutoff]
-    testFeats = helpful[helpfulCutoff:] + unhelpful[unhelpfulCutoff:]
+    y_data = []
+    y_data.extend(np.zeros(len(class_0)))
+    y_data.extend(np.ones(len(class_1)))
 
-    classifier = NaiveBayesClassifier.train(trainFeats)
-    print 'accuracy:', nltk.classify.util.accuracy(classifier, testFeats)
-    classifier.show_most_informative_features() 
+    assert(len(x_data) == len(y_data))
 
-def getText(list):
+    z = zip(x_data, y_data)
+    shuffle(z)
+    x_data, y_data = zip(*z)
+
+    cutoff = len(x_data) * 3/4
+    #print x_data[0]
+    #print y_data[0]
+    #exit()
+
+    vectorizer = HashingVectorizer(stop_words = 'english', non_negative = True, n_features = 2)
+    x_train = vectorizer.transform(x_data[:cutoff])
+    y_train = y_data[:cutoff]
+
+    x_test = vectorizer.transform(x_data[cutoff:])
+    y_test = y_data[cutoff:]
+
+    nb = BernoulliNB()
+    nb.fit(x_train, y_train)
+
+    prediction = nb.predict(x_test)
+    score = metrics.accuracy_score(y_test, prediction)
+    print ("accuracy: %0.3f" % score)
+
+    show_most_informative_features(vectorizer, nb) 
+
+
+def getText(reviews):
 
     text = []    
-    tokenizer = RegexpTokenizer(r'\w+')
-    tokenizer.tokenize('Eighty-seven miles to go, yet.  Onward!')
+    #tokenizer = RegexpTokenizer(r'\w+')
     
     for review in reviews:
-        text.extend( tokenizer.tokenize( review['Text'].lower() ) )
+        #text.extend( tokenizer.tokenize( review['Text'].lower() ) )
+        text.append( review['Text'].lower() )
 
     return text
+
+def show_most_informative_features(vectorizer, clf, n=20):
+    feature_names = vectorizer.get_feature_names()
+    coefs_with_fns = sorted(zip(clf.coef_[0], feature_names))
+    top = zip(coefs_with_fns[:n], coefs_with_fns[:-(n + 1):-1])
+    for (coef_1, fn_1), (coef_2, fn_2) in top:
+        print "\t%.4f\t%-15s\t\t%.4f\t%-15s" % (coef_1, fn_1, coef_2, fn_2)
+
 
 if __name__ == "__main__":
     reviews = importReviews('reviews-10000.csv')
     categorized = splitReviews(reviews)
     train(categorized)
     
+
+
