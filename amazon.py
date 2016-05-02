@@ -2,119 +2,169 @@ import csv
 import numpy as np
 from random import shuffle
 import nltk.classify.util
-from nltk.classify import NaiveBayesClassifier
 from nltk.tokenize import RegexpTokenizer
-from sklearn.feature_extraction.text import HashingVectorizer, CountVectorizer 
-from sklearn.naive_bayes import BernoulliNB
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import HashingVectorizer
+from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.linear_model import RidgeClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.svm import SVC 
+from sklearn.svm import LinearSVC
+from sklearn.svm import NuSVC
+from sklearn.svm import SVR
+from sklearn.svm import LinearSVR
+from sklearn.svm import NuSVR
+from sklearn.svm import OneClassSVM
+from sklearn.linear_model import SGDClassifier
+from sklearn.linear_model import Perceptron
+from sklearn.linear_model import PassiveAggressiveClassifier
+from sklearn.naive_bayes import BernoulliNB, MultinomialNB
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import NearestCentroid
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.utils.extmath import density
 from sklearn import metrics
+
+class PreProcessing():
     
-
-def importReviews(filename):
-    reviews = []
-    with open(filename) as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            reviews.append(row)
-    
-    return reviews
-
-def splitReviews(reviews):
-    positive = []
-    negative = []
-
-    helpful = []
-    unhelpful = []
-
-    for review in reviews:
-        score = int(review['Score'])
-        if score > 3:
-            positive.append(review)
-        if score < 3:
-            negative.append(review)
-    
-        helpful_num = float(review['HelpfulnessNumerator'])
-        helpful_denom = float(review['HelpfulnessDenominator'])
+    def importReviews(self, filename):
+        reviews = []
+        with open(filename) as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                reviews.append(row)
         
-        if helpful_denom: 
-            helpful_ratio = (helpful_num / helpful_denom)
+        return reviews
+
+    def splitReviews(self, reviews):
+        positive = []
+        negative = []
+
+        helpful = []
+        unhelpful = []
+
+        for review in reviews:
+            score = int(review['Score'])
+            if score > 3:
+                positive.append(review)
+            if score < 3:
+                negative.append(review)
+        
+            helpful_num = float(review['HelpfulnessNumerator'])
+            helpful_denom = float(review['HelpfulnessDenominator'])
             
-            if helpful_ratio > .5:
-                helpful.append(review)
-            if helpful_ratio < .5:
-                unhelpful.append(review)
+            if helpful_denom: 
+                helpful_ratio = (helpful_num / helpful_denom)
+                
+                if helpful_ratio > .5:
+                    helpful.append(review)
+                if helpful_ratio < .5:
+                    unhelpful.append(review)
 
-    return {
-            'positive': positive, 
-            'negative': negative, 
-            'helpful': helpful,
-            'unhelpful': unhelpful
-            }
+        return {
+                'positive': positive, 
+                'negative': negative, 
+                'helpful': helpful,
+                'unhelpful': unhelpful
+                }
 
-def train(categorized):
+class Classifiers(PreProcessing):
+    def __init__(self):
+        self.class_0 = []
+        self.class_1 = []
 
-    class_0 = getText(categorized['helpful'])
-    class_1 = getText(categorized['unhelpful'])
+        self.x_data = []
+        self.y_data = []
 
+        self.x_train = self.x_test = []
+        self.y_train = self.y_test = []
 
-    x_data = []
-    x_data.extend(class_0)
-    x_data.extend(class_1)
+        #cl = LinearSVC(algorithm='SAMME')
+        cl = BernoulliNB()
+        cl = DecisionTreeClassifier()
+        self.classifiers = [
+                LinearSVC(loss='squared_hinge', penalty='l1', dual=False, tol=1e-3),
+                #SGDClassifier(alpha=.0001, n_iter=50, penalty="elasticnet"),
+                #BernoulliNB(alpha=.01),
+                #MultinomialNB(alpha=.01),
+                #RidgeClassifier(tol=1e-2, solver="sag"),
+                #Perceptron(n_iter=50),
+                #PassiveAggressiveClassifier(n_iter=50),
+                #KNeighborsClassifier(n_neighbors=10), 
+                #RandomForestClassifier(n_estimators=100),
+                #SVC(),
+                #NuSVC(),
+                #SVR(),
+                #LinearSVR(),
 
-    y_data = []
-    y_data.extend(np.zeros(len(class_0)))
-    y_data.extend(np.ones(len(class_1)))
-
-    assert(len(x_data) == len(y_data))
-
-    z = zip(x_data, y_data)
-    shuffle(z)
-    x_data, y_data = zip(*z)
-
-    cutoff = len(x_data) * 3/4
-    #print x_data[0]
-    #print y_data[0]
-    #exit()
-
-    vectorizer = HashingVectorizer(stop_words = 'english', non_negative = True, n_features = 2)
-    x_train = vectorizer.transform(x_data[:cutoff])
-    y_train = y_data[:cutoff]
-
-    x_test = vectorizer.transform(x_data[cutoff:])
-    y_test = y_data[cutoff:]
-
-    nb = BernoulliNB()
-    nb.fit(x_train, y_train)
-
-    prediction = nb.predict(x_test)
-    score = metrics.accuracy_score(y_test, prediction)
-    print ("accuracy: %0.3f" % score)
-
-    show_most_informative_features(vectorizer, nb) 
+                AdaBoostClassifier(n_estimators=10, base_estimator=cl)
 
 
-def getText(reviews):
+                ]
 
-    text = []    
-    #tokenizer = RegexpTokenizer(r'\w+')
-    
-    for review in reviews:
-        #text.extend( tokenizer.tokenize( review['Text'].lower() ) )
-        text.append( review['Text'].lower() )
+    def split_data(self, categorized):
 
-    return text
+        class_0 = self.getText(categorized['positive'])  	
+        class_1 = self.getText(categorized['negative'])
 
-def show_most_informative_features(vectorizer, clf, n=20):
-    feature_names = vectorizer.get_feature_names()
-    coefs_with_fns = sorted(zip(clf.coef_[0], feature_names))
-    top = zip(coefs_with_fns[:n], coefs_with_fns[:-(n + 1):-1])
-    for (coef_1, fn_1), (coef_2, fn_2) in top:
-        print "\t%.4f\t%-15s\t\t%.4f\t%-15s" % (coef_1, fn_1, coef_2, fn_2)
+        self.x_data.extend(class_0)
+        self.x_data.extend(class_1)
+
+        self.y_data.extend(np.zeros(len(class_0)))
+        self.y_data.extend(np.ones(len(class_1)))
+
+        assert(len(self.x_data) == len(self.y_data))
+
+        z = zip(self.x_data, self.y_data)
+        shuffle(z)
+        self.x_data, self.y_data = zip(*z)
+
+        cutoff = len(self.x_data) * 3/4
+
+        #vectorizer = HashingVectorizer(stop_words = 'english', non_negative = True, n_features = 10)
+        vectorizer = TfidfVectorizer(sublinear_tf=True, max_df=.5)
+        
+        #self.x_train = vectorizer.transform(self.x_data[:cutoff])
+        self.x_train = vectorizer.fit_transform(self.x_data[:cutoff])
+        self.y_train = self.y_data[:cutoff]
+
+        self.x_test = vectorizer.transform(self.x_data[cutoff:])
+        self.y_test = self.y_data[cutoff:]
+
+    def benchmark(self, classifier):
+        
+        classifier.fit(self.x_train, self.y_train)
+        prediction = classifier.predict(self.x_test)
+
+        score = metrics.accuracy_score(self.y_test, prediction)
+        print ("accuracy: %0.5f" % score)
+
+    def run_classifiers(self):
+        
+        for classifier in self.classifiers:
+            self.benchmark(classifier)
+
+    def getText(self, reviews):
+
+        text = []    
+        #tokenizer = RegexpTokenizer(r'\w+')
+        
+        for review in reviews:
+            #text.extend( tokenizer.tokenize( review['Text'].lower() ) )
+            text.append( review['Text'].lower() )
+
+        return text
 
 
 if __name__ == "__main__":
-    reviews = importReviews('reviews-10000.csv')
-    categorized = splitReviews(reviews)
-    train(categorized)
-    
+    preprocessing = PreProcessing()
+    reviews = preprocessing.importReviews('reviews-10000.csv')
+    #reviews = preprocessing.importReviews('all-reviews.csv')
+    categorized = preprocessing.splitReviews(reviews)
 
+    classifiers = Classifiers()    
+    classifiers.split_data(categorized)
+    classifiers.run_classifiers()
 
