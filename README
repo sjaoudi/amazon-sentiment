@@ -1,1 +1,14 @@
-Explain how to run your code here.
+The entire program is in amazon.py.
+Sklearn, numpy, and matplotlib should be the only required external libraries.
+
+The complete dataset is not included, but can be found here:
+https://www.kaggle.com/snap/amazon-fine-food-reviews
+It should be renamed "all-reviews.csv", although it's very large, so 1,000 and
+10,000 review subsets are included. Uncomment the desired csv file at
+the bottom of amazon.py.
+
+The method "runClassifiers" will run all classifiers listed in the self.classifiers
+variable on the categories in the PreProcessing class initializer on line 29.
+
+The "gridSearch" method can also be run with different classifiers and parameters.
+http://scikit-learn.org/stable/modules/grid_search.html (See examples)
