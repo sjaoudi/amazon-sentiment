@@ -2,25 +2,17 @@ import csv
 from time import time
 import numpy as np
 from random import shuffle
-from sklearn.feature_extraction.text import TfidfVectorizer, TfidfTransformer
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.linear_model import RidgeClassifier
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
+from sklearn.linear_model import LogisticRegression, RidgeClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.svm import SVC
-from sklearn.svm import LinearSVC
-from sklearn.linear_model import SGDClassifier
-from sklearn.linear_model import Perceptron
-from sklearn.linear_model import PassiveAggressiveClassifier
+from sklearn.svm import SVC, LinearSVC
+from sklearn.linear_model import SGDClassifier, Perceptron, PassiveAggressiveClassifier
 from sklearn.naive_bayes import BernoulliNB, MultinomialNB
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.neighbors import NearestCentroid
+from sklearn.neighbors import KNeighborsClassifier, NearestCentroid
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.grid_search import GridSearchCV
 from sklearn import metrics
-from sklearn.datasets import fetch_20newsgroups
-from matplotlib import pylab
 import matplotlib.pyplot as plt
-from matplotlib.font_manager import FontProperties
 
 """
 Class with methods for preprocessing the csv and categorizing the data.
@@ -30,11 +22,11 @@ class PreProcessing():
 
         # Uncomment the pair of categories the classifier should predict
 
-        #self.category_0 = 'helpful'
-        #self.category_1 = 'unhelpful'
+        # self.category_0 = 'helpful'
+        # self.category_1 = 'unhelpful'
 
-        self.category_0 = 'positive'
-        self.category_1 = 'negative'
+        self.category_0 = 'negative'
+        self.category_1 = 'positive'
 
     def importReviews(self, filename):
         reviews = []
@@ -50,8 +42,10 @@ class PreProcessing():
         positive = []
         negative = []
 
-        helpful = []
-        unhelpful = []
+        one_star = two_star = three_star = four_star = five_star = []
+
+        # helpful = []
+        # unhelpful = []
 
         for review in reviews:
             score = int(review['Score'])
@@ -60,26 +54,47 @@ class PreProcessing():
             if score < 3:
                 negative.append(review)
 
-            helpful_num = float(review['HelpfulnessNumerator'])
-            helpful_denom = float(review['HelpfulnessDenominator'])
+            if score == 1:
+                one_star.append(review)
+            if score == 2:
+                two_star.append(review)
+            if score == 3:
+                three_star.append(review)
+            if score == 4:
+                four_star.append(review)
+            if score == 5:
+                five_star.append(review)
 
-            if helpful_denom:
-                helpful_ratio = (helpful_num / helpful_denom)
 
-                # "Helpful"
-                if helpful_ratio > .5:
-                    helpful.append(review)
+            # helpful_num = float(review['HelpfulnessNumerator'])
+            # helpful_denom = float(review['HelpfulnessDenominator'])
 
-                # "Unhelpful"
-                if helpful_ratio < .5:
-                    unhelpful.append(review)
+            # if helpful_denom:
+            #     helpful_ratio = (helpful_num / helpful_denom)
+            #
+            #     # "Helpful"
+            #     if helpful_ratio > .5:
+            #         helpful.append(review)
+            #
+            #     # "Unhelpful"
+            #     if helpful_ratio < .5:
+            #         unhelpful.append(review)
 
+        # return {
+        #     'positive': positive,
+        #     'negative': negative,
+        #     'helpful': helpful,
+        #     'unhelpful': unhelpful
+        #     }
         return {
-            'positive': positive,
-            'negative': negative,
-            'helpful': helpful,
-            'unhelpful': unhelpful
-            }
+            "positive": positive,
+            "negative": negative,
+            "one_star": one_star,
+            "two_star": two_star,
+            "three_star": three_star,
+            "four_star": four_star,
+            "five_star": five_star
+        }
 
 
     def getText(self, reviews):
@@ -94,6 +109,13 @@ class PreProcessing():
 
         class_0 = self.getText(categorized[self.category_0])
         class_1 = self.getText(categorized[self.category_1])
+
+        shorter = len(class_0) if len(class_0) < len(class_1) else len(class_1)
+        class_0 = class_0[:shorter]
+        class_1 = class_1[:shorter]
+
+        print len(class_0), len(class_1)
+        assert(len(class_0) == len(class_1))
 
         x_data = []
         x_data.extend(class_0)
@@ -139,21 +161,29 @@ class Classifiers():
         self.preprocessData()
 
         self.classifiers = {
-            "LinearSVC": LinearSVC(loss='squared_hinge', penalty='l1', dual=False, tol=1e-3),
-            "SGD": SGDClassifier(alpha=.0001, n_iter=50, penalty="elasticnet"),
-            "Bernoulli Naive Bayes": BernoulliNB(alpha=.01),
-            "Ridge": RidgeClassifier(tol=1e-2, solver="sag"),
-            "Perceptron": Perceptron(n_iter=50),
-            "Passive Aggressive": PassiveAggressiveClassifier(n_iter=50),
-            #"KNN": KNeighborsClassifier(n_neighbors=10),
-            #"Random Forest": RandomForestClassifier(n_estimators=100),
-            #"SVC": SVC(),
+            # "LinearSVC": LinearSVC(loss='squared_hinge', penalty='l1', dual=False, tol=1e-3),
+            # "SGD": SGDClassifier(alpha=.0001, n_iter=50, penalty="elasticnet"),
+            # "Bernoulli Naive Bayes": BernoulliNB(alpha=.01),
+            # "Ridge": RidgeClassifier(tol=1e-2, solver="sag"),
+            # "Perceptron": Perceptron(n_iter=50),
+            # "Passive Aggressive": PassiveAggressiveClassifier(n_iter=50),
+            # "Multinomial NB": MultinomialNB(),
+            # "Log-reg": LogisticRegression(C=1e5)
+            # "KNN": KNeighborsClassifier(n_neighbors=10),
+            "Random Forest": RandomForestClassifier(n_estimators=100),
+            # "SVC": SVC(),
             }
 
         self.vectorizers = {
-            "Tfidf": TfidfVectorizer(stop_words = 'english', sublinear_tf = True, use_idf = 'True', max_df = .50, norm = 'l2'),
+            "Tfidf": TfidfVectorizer(
+             stop_words = 'english',
+             token_pattern=r'\b\w+\b',
+             sublinear_tf = True,
+             use_idf = 'True', max_df = .50, norm = 'l2'),
             "Count": CountVectorizer(stop_words = 'english', max_df = .5, max_features = 5000, ngram_range = (1, 1))
-            }
+        }
+
+        self.prediction = dict()
 
 
     """
@@ -168,6 +198,7 @@ class Classifiers():
 
 
     def train(self, vectorizer):
+        assert(len(self.x_data) == len(self.y_data))
         cutoff = len(self.x_data) * 3/4
 
         self.x_train = vectorizer.fit_transform(self.x_data[:cutoff])
@@ -196,41 +227,72 @@ class Classifiers():
         print "accuracy: %0.5f" % score
         return desc, score, train_time, test_time
 
+    def predict(self, classifier):
+
+        model = classifier.fit(self.x_train, self.y_train)
+        prediction = model.predict(self.x_test)
+
+        return prediction
 
     def runClassifiers(self):
 
         vectorizer = self.vectorizers["Tfidf"]
-        #vectorizer = self.vectorizers["Count"]
+        # vectorizer = self.vectorizers["Count"]
         self.train(vectorizer)
 
         # List of classifier description, score, train time, and test time,
         # which is necessary for plotting
         results = []
 
-        #clf = LinearSVC(C=1, penalty='l2', loss='squared_hinge')
-        #clf = LinearSVC()
-        #self.benchmark(clf)
-        #exit()
-
         for classifier_name in self.classifiers:
             print classifier_name
 
             classifier = self.classifiers[classifier_name]
             result = self.benchmark(classifier)
+            print result
             results.append(result)
 
-            # Prints the most informative features for the classifier
-            self.topFeatures(classifier, vectorizer)
-            print ''
+            prediction = self.predict(classifier)
+            self.prediction[classifier_name] = prediction
 
-        self.plot(results)
+            # Prints the most informative features for the classifier
+            # self.topFeatures(classifier, vectorizer)
+            self.plot_confusion_matrix(classifier_name)
+            print ''
+            break
+
+        # classifier = self.classifiers["LinearSVC"]
+        # result = self.benchmark(classifier)
+        # results.append(result)
+        #
+        # prediction = self.predict(classifier)
+        # self.prediction["LinearSVC"] = prediction
+
+        # self.plot(results)
+        # print self.prediction
+
+        # Compute confusion matrix
+
+        # print(metrics.classification_report(self.y_test, self.prediction['LinearSVC'], digits=3, target_names = ["positive", "negative"]))
+        # self.plotROC()
 
 
     def topFeatures(self, classifier, vectorizer):
+        f = open('out.txt', 'w')
         feature_names = np.asarray(vectorizer.get_feature_names())
         categories = list(set(self.y_train))
-        top10 = np.argsort(classifier.coef_[0])[-10:]
+        top10 = np.argsort(classifier.coef_[0])[-100:]
+        ranks =  zip(feature_names[top10], top10)
         print feature_names[top10]
+
+        for r in ranks:
+            name, score = r
+            # print name, score
+            f.write(str(score / 100))
+            f.write(' ')
+            f.write(str(name))
+            f.write('\n')
+        # print feature_names[top10]
 
 
     def plot(self, results):
@@ -255,13 +317,79 @@ class Classifiers():
         plt.subplots_adjust(top=.95)
         plt.subplots_adjust(bottom=.05)
 
-        plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05),
-                          ncol=3, fancybox=True, shadow=True)
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.05), ncol=3, fancybox=True, shadow=True)
 
         for i, c in zip(indices, clf_names):
             print i, c
             plt.text(-.3, i, c)
 
+        plt.show()
+
+
+    def plot_confusion_matrix(self, model):
+
+        # print self.prediction.keys()
+        y_pred =  self.prediction[model]
+
+        cmap=plt.cm.Reds
+        cm = metrics.confusion_matrix(self.y_test, y_pred)
+        np.set_printoptions(precision=3)
+        cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print cm_normalized
+        # np.set_printoptions(precision=2)
+        # plt.figure()
+        #
+        # plt.imshow(cm_normalized, interpolation='nearest', cmap=cmap)
+        # title='Normalized Confusion matrix'
+        # plt.title(title)
+        # plt.colorbar()
+        #
+        # tick_marks = np.arange(len(set(self.y_test)))
+        # plt.xticks(tick_marks, set(self.y_test), rotation=45)
+        # plt.yticks(tick_marks, set(self.y_test))
+        # plt.tight_layout()
+        # plt.ylabel('True label')
+        # plt.xlabel('Predicted label')
+        #
+        # plt.show()
+
+    def plotROC(self):
+        # Compute ROC curve and ROC area for each class
+
+        fpr = dict()
+        tpr = dict()
+        roc_auc = dict()
+
+        n_classes = 2
+
+        cmp = 0
+        colors = ['b', 'g', 'y', 'm', 'k', 'r', 'b', 'r']
+        for model, predicted in self.prediction.items():
+            false_positive_rate, true_positive_rate, thresholds = metrics.roc_curve(self.y_test, predicted)
+            roc_auc = metrics.auc(false_positive_rate, true_positive_rate)
+            plt.plot(false_positive_rate, true_positive_rate, colors[cmp], label='%s: AUC %0.2f'% (model,roc_auc))
+            cmp += 1
+            print model, false_positive_rate, true_positive_rate
+
+            # fpr[model], tpr[model], _ = metrics.roc_curve(self.y_test, predicted)
+            # roc_auc[model] = metrics.auc(fpr[model], tpr[model])
+            # plt.plot(false_positive_rate, true_positive_rate, colors[cmp], label='%s: AUC %0.2f'% (model,roc_auc))
+            # cmp += 1
+            # print model, false_positive_rate, true_positive_rate
+
+
+        # all_predictions = np.concatenate([self.prediction[key] for key in self.prediction])
+        # fpr["micro"], tpr["micro"], _ = metrics.roc_curve(self.y_test, all_predictions.ravel())
+        # roc_auc["micro"] = metrics.auc(fpr["micro"], tpr["micro"])
+
+
+        plt.title('Classifiers comparaison with ROC')
+        plt.legend(loc='lower right')
+        plt.plot([0,1],[0,1],'r--')
+        plt.xlim([0,1.0])
+        plt.ylim([0,1.0])
+        plt.ylabel('True Positive Rate')
+        plt.xlabel('False Positive Rate')
         plt.show()
 
 
@@ -317,9 +445,9 @@ class Classifiers():
 
 
 if __name__ == "__main__":
-    #filename = 'reviews-1000.csv'
+    # filename = 'reviews-1000.csv'
     filename = 'reviews-10000.csv'
-    #filename = 'all-reviews.csv'
+    # filename = 'all-reviews.csv'
 
     classifiers = Classifiers(filename)
 
