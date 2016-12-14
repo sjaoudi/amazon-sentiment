@@ -13,4 +13,5 @@ variable on the categories in the PreProcessing class initializer on line 29.
 The "gridSearch" method can also be run with different classifiers and parameters.
 http://scikit-learn.org/stable/modules/grid_search.html (See examples)
 
-[See my poster on this] (https://github.com/sjaoudi/amazon-sentiment/blob/master/cs_ai_poster.pdf)
+See my poster on this:
+https://github.com/sjaoudi/amazon-sentiment/blob/master/cs_ai_poster.pdf
